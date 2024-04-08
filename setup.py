@@ -26,7 +26,7 @@ if sys.version_info < (3, 8):
         Since version 1.0.0, python-chess requires Python 3.7 or later.
         """))
 
-import chess
+import musketeerchess
 
 
 def read_description():
@@ -40,12 +40,12 @@ def read_description():
     # Link to the documentation of the specific version.
     description = description.replace(
         "//python-chess.readthedocs.io/en/latest/",
-        "//python-chess.readthedocs.io/en/v{}/".format(chess.__version__))
+        "//python-chess.readthedocs.io/en/v{}/".format(musketeerchess.__version__))
 
     # Use documentation badge for the specific version.
     description = description.replace(
         "//readthedocs.org/projects/python-chess/badge/?version=latest",
-        "//readthedocs.org/projects/python-chess/badge/?version=v{}".format(chess.__version__))
+        "//readthedocs.org/projects/python-chess/badge/?version=v{}".format(musketeerchess.__version__))
 
     # Remove doctest comments.
     description = re.sub(r"\s*# doctest:.*", "", description)
@@ -54,21 +54,21 @@ def read_description():
 
 
 setuptools.setup(
-    name="chess",
-    version=chess.__version__,
-    author=chess.__author__,
-    author_email=chess.__email__,
-    description=chess.__doc__.replace("\n", " ").strip(),
+    name="musketeerchess",
+    version=musketeerchess.__version__,
+    author=musketeerchess.__author__,
+    author_email=musketeerchess.__email__,
+    description=musketeerchess.__doc__.replace("\n", " ").strip(),
     long_description=read_description(),
     long_description_content_type="text/x-rst",
     license="GPL-3.0+",
-    keywords="chess fen epd pgn polyglot syzygy gaviota uci xboard",
+    keywords="musketeerchess fen epd pgn polyglot syzygy gaviota uci xboard",
     url="https://github.com/niklasf/python-chess",
-    packages=["chess"],
+    packages=["musketeerchess"],
     test_suite="test",
     zip_safe=False,  # For mypy
     package_data={
-        "chess": ["py.typed"],
+        "musketeerchess": ["py.typed"],
     },
     python_requires=">=3.8",
     classifiers=[
@@ -91,5 +91,5 @@ setuptools.setup(
     project_urls={
         "Documentation": "https://python-chess.readthedocs.io",
     },
-    obsoletes=["python_chess"],
+    obsoletes=["python_musketeerchess"],
 )

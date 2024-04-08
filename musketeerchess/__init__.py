@@ -7,11 +7,11 @@ Syzygy tablebase probing, and XBoard/UCI engine communication.
 
 from __future__ import annotations
 
-__author__ = "Niklas Fiekas"
+__author__ = "David Nguyen"
 
-__email__ = "niklas.fiekas@backscattering.de"
+__email__ = "davidn911016@gmail.com"
 
-__version__ = "1.10.0"
+__version__ = "1.0.0"
 
 import collections
 import copy
@@ -33,10 +33,12 @@ ColorName = Literal["white", "black"]
 COLOR_NAMES: List[ColorName] = ["black", "white"]
 
 PieceType = int
-PIECE_TYPES = [PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING] = range(1, 7)
-MUSKETEER_PIECE_TYPES = [LEOPARD, CANNON, UNICORN, DRAGON, CHANCELLOR, ARCHBISHOP, ELEPHANT, HAWK, FORTRESS, SPIDER] = range(1, 7)
-PIECE_SYMBOLS = [None, "p", "n", "b", "r", "q", "k"]
-PIECE_NAMES = [None, "pawn", "knight", "bishop", "rook", "queen", "king"]
+PIECE_TYPES = [PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, LEOPARD, CANNON, UNICORN, DRAGON, CHANCELLOR, ARCHBISHOP, ELEPHANT, HAWK, FORTRESS, SPIDER] = range(1, 17)
+# MUSKETEER_PIECE_TYPES = [LEOPARD, CANNON, UNICORN, DRAGON, CHANCELLOR, ARCHBISHOP, ELEPHANT, HAWK, FORTRESS, SPIDER] = range(7, 17)
+PIECE_SYMBOLS = [None, "p", "n", "b", "r", "q", "k", "l", "c", "u", "d", "m", "a", "e", "h", "f", "s"]
+PIECE_NAMES = [None, "pawn", "knight", "bishop", "rook", "queen", "king", "leopard", "cannon", "unicorn", "dragon", "chancellor", "archbishop", "elephant", "hawk", "fortress", "spider"]
+
+
 
 def piece_symbol(piece_type: PieceType) -> str:
     return typing.cast(str, PIECE_SYMBOLS[piece_type])
@@ -56,8 +58,10 @@ UNICODE_PIECE_SYMBOLS = {
 FILE_NAMES = ["a", "b", "c", "d", "e", "f", "g", "h"]
 
 RANK_NAMES = ["1", "2", "3", "4", "5", "6", "7", "8"]
+# RANK_NAMES = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
 STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+# STARTING_FEN = "********/rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR/******** w KQkq - 0 1"
 """The FEN for the standard chess starting position."""
 
 STARTING_BOARD_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
@@ -381,7 +385,7 @@ def _sliding_attacks(square: Square, occupied: Bitboard, deltas: Iterable[int]) 
 
         while True:
             sq += delta
-            if not (0 <= sq < 64) or square_distance(sq, sq - delta) > 2:
+            if not (0 <= sq < 64) or square_distance(sq, sq - delta) > 3:
                 break
 
             attacks |= BB_SQUARES[sq]
@@ -397,6 +401,10 @@ def _step_attacks(square: Square, deltas: Iterable[int]) -> Bitboard:
 BB_KNIGHT_ATTACKS = [_step_attacks(sq, [17, 15, 10, 6, -17, -15, -10, -6]) for sq in SQUARES]
 BB_KING_ATTACKS = [_step_attacks(sq, [9, 8, 7, 1, -9, -8, -7, -1]) for sq in SQUARES]
 BB_PAWN_ATTACKS = [[_step_attacks(sq, deltas) for sq in SQUARES] for deltas in [[-7, -9], [7, 9]]]
+BB_LEOPARD_ATTACKS = [_step_attacks(sq, [18, 17, 15, 14, 10, 9, 7, 6, -6, -7, -9, -10, -14, -15, -17, -18]) for sq in SQUARES]
+BB_FB_KNIGHT_ATTACKS = [_step_attacks(sq, [17, 15, -17, -15]) for sq in SQUARES]
+BB_UNICORN_ATTACKS = [_step_attacks(sq, [25, 23, 17, 15, 11, 10, 6, 5, -5, -6, -10, -11, -15, -17, -23, -25]) for sq in SQUARES]
+BB_HAWK_ATTACKS = [_step_attacks(sq, [-27, -24, -21, -18, -16, -14, -3, -2, 2, 3, 14, 16, 18, 21, 24, 27]) for sq in SQUARES]
 
 
 def _edges(square: Square) -> Bitboard:
@@ -431,6 +439,8 @@ def _attack_table(deltas: List[int]) -> Tuple[List[Bitboard], List[Dict[Bitboard
 BB_DIAG_MASKS, BB_DIAG_ATTACKS = _attack_table([-9, -7, 7, 9])
 BB_FILE_MASKS, BB_FILE_ATTACKS = _attack_table([-8, 8])
 BB_RANK_MASKS, BB_RANK_ATTACKS = _attack_table([-1, 1])
+BB_HOR_VER_2_MASKS, BB_HOR_VER_2_ATTACKS = _attack_table([-16, -2, 2, 16])
+BB_DIAG_2_MASKS, BB_DIAG_2_ATTACKS = _attack_table([-18, -14, 14, 18])
 
 
 def _rays() -> List[List[Bitboard]]:
@@ -459,7 +469,8 @@ def between(a: Square, b: Square) -> Bitboard:
     return bb & (bb - 1)
 
 
-SAN_REGEX = re.compile(r"^([NBKRQ])?([a-h])?([1-8])?[\-x]?([a-h][1-8])(=?[nbrqkNBRQK])?[\+#]?\Z")
+# SAN_REGEX = re.compile(r"^([NBKRQ])?([a-h])?([1-8])?[\-x]?([a-h][1-8])(=?[nbrqkNBRQK])?[\+#]?\Z")
+SAN_REGEX = re.compile(r"^([NBKRQLCUDMAEHFS])?([a-h])?([1-8])?[\-x]?([a-h][1-8])(=?[nbrqkNBRQKLCUDMAEHFS])?[\+#]?\Z")
 
 FEN_CASTLING_REGEX = re.compile(r"^(?:-|[KQABCDEFGH]{0,2}[kqabcdefgh]{0,2})\Z")
 
@@ -638,6 +649,16 @@ class BaseBoard:
         self.rooks = BB_CORNERS
         self.queens = BB_D1 | BB_D8
         self.kings = BB_E1 | BB_E8
+        self.leopards = 0
+        self.cannons = 0
+        self.unicorns = 0
+        self.dragons = 0
+        self.chancellors = 0
+        self.archbishops = 0
+        self.elephants = 0
+        self.hawks = 0
+        self.fortresses = 0
+        self.spiders = 0
 
         self.promoted = BB_EMPTY
 
@@ -690,6 +711,26 @@ class BaseBoard:
             bb = self.queens
         elif piece_type == KING:
             bb = self.kings
+        elif piece_type == LEOPARD:
+            bb = self.leopards
+        elif piece_type == CANNON:
+            bb = self.cannons
+        elif piece_type == UNICORN:
+            bb = self.unicorns
+        elif piece_type == DRAGON:
+            bb = self.dragons
+        elif piece_type == CHANCELLOR:
+            bb = self.chancellors
+        elif piece_type == ARCHBISHOP:
+            bb = self.archbishops
+        elif piece_type == ELEPHANT:
+            bb = self.elephants
+        elif piece_type == HAWK:
+            bb = self.hawks
+        elif piece_type == FORTRESS:
+            bb = self.fortresses
+        elif piece_type == SPIDER:
+            bb = self.spiders
         else:
             assert False, f"expected PieceType, got {piece_type!r}"
 
@@ -729,6 +770,26 @@ class BaseBoard:
             return ROOK
         elif self.queens & mask:
             return QUEEN
+        elif self.leopards & mask:
+            return LEOPARD
+        elif self.cannons & mask:
+            return CANNON
+        elif self.unicorns & mask:
+            return UNICORN
+        elif self.dragons & mask:
+            return DRAGON
+        elif self.chancellors & mask:
+            return CHANCELLOR
+        elif self.archbishops & mask:
+            return ARCHBISHOP
+        elif self.elephants & mask:
+            return ELEPHANT
+        elif self.hawks & mask:
+            return HAWK
+        elif self.fortresses & mask:
+            return FORTRESS
+        elif self.spiders & mask:
+            return SPIDER
         else:
             return KING
 
@@ -763,14 +824,45 @@ class BaseBoard:
             return BB_KNIGHT_ATTACKS[square]
         elif bb_square & self.kings:
             return BB_KING_ATTACKS[square]
-        else:
-            attacks = 0
-            if bb_square & self.bishops or bb_square & self.queens:
-                attacks = BB_DIAG_ATTACKS[square][BB_DIAG_MASKS[square] & self.occupied]
-            if bb_square & self.rooks or bb_square & self.queens:
-                attacks |= (BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & self.occupied] |
-                            BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & self.occupied])
-            return attacks
+        elif bb_square & self.queens:
+            return BB_DIAG_ATTACKS[square][BB_DIAG_MASKS[square] & self.occupied] | (BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & self.occupied] |
+                BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & self.occupied])
+        elif bb_square & self.bishops:
+            return BB_DIAG_ATTACKS[square][BB_DIAG_MASKS[square] & self.occupied]
+        elif bb_square & self.rooks:
+            return (BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & self.occupied] |
+                BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & self.occupied])
+        elif bb_square & self.leopards:
+            return BB_LEOPARD_ATTACKS[square]
+        elif bb_square & self.unicorns:
+            return BB_UNICORN_ATTACKS[square]
+        elif bb_square & self.cannons:
+            return BB_KNIGHT_ATTACKS[square] | BB_KING_ATTACKS[square] | BB_HOR_VER_2_ATTACKS[square][BB_HOR_VER_2_MASKS[square] & self.occupied]
+        elif bb_square & self.dragons: 
+            return BB_KNIGHT_ATTACKS[square] | BB_DIAG_ATTACKS[square][BB_DIAG_MASKS[square] & self.occupied] | (BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & self.occupied] |
+                BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & self.occupied])
+        elif bb_square & self.chancellors:
+            return (BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & self.occupied] |
+                BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & self.occupied]) | BB_KNIGHT_ATTACKS[square]
+        elif bb_square & self.archbishops:
+            return BB_DIAG_ATTACKS[square][BB_DIAG_MASKS[square] & self.occupied] | BB_KNIGHT_ATTACKS[square]
+        elif bb_square & self.elephants:
+            return BB_KING_ATTACKS[square] | BB_HOR_VER_2_ATTACKS[square][BB_HOR_VER_2_MASKS[square] & self.occupied] | BB_DIAG_2_ATTACKS[square][BB_DIAG_2_MASKS[square] & self.occupied]
+        elif bb_square & self.hawks:
+            return BB_HAWK_ATTACKS[square]
+        elif bb_square & self.fortresses:
+            return BB_DIAG_ATTACKS[square][BB_DIAG_MASKS[square] & self.occupied] | BB_HOR_VER_2_ATTACKS[square][BB_HOR_VER_2_MASKS[square] & self.occupied] | BB_FB_KNIGHT_ATTACKS[square]
+        elif bb_square & self.spiders:
+            return BB_KNIGHT_ATTACKS[square] | BB_HOR_VER_2_ATTACKS[square][BB_HOR_VER_2_MASKS[square] & self.occupied]
+        
+        # else:
+        #     attacks = 0
+        #     if bb_square & self.bishops or bb_square & self.queens:
+        #         attacks = BB_DIAG_ATTACKS[square][BB_DIAG_MASKS[square] & self.occupied]
+        #     if bb_square & self.rooks or bb_square & self.queens:
+        #         attacks |= (BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & self.occupied] |
+        #                     BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & self.occupied])
+        #     return attacks
 
     def attacks(self, square: Square) -> SquareSet:
         """
@@ -895,6 +987,26 @@ class BaseBoard:
             self.queens ^= mask
         elif piece_type == KING:
             self.kings ^= mask
+        elif piece_type == LEOPARD:
+            self.leopards ^= mask
+        elif piece_type == CANNON:
+            self.cannons ^= mask
+        elif piece_type == UNICORN:
+            self.unicorns ^= mask
+        elif piece_type == DRAGON:
+            self.dragons ^= mask
+        elif piece_type == CHANCELLOR:
+            self.chancellors ^= mask
+        elif piece_type == ARCHBISHOP:
+            self.archbishops ^= mask
+        elif piece_type == ELEPHANT:
+            self.elephants ^= mask
+        elif piece_type == HAWK:
+            self.hawks ^= mask
+        elif piece_type == FORTRESS:
+            self.fortresses ^= mask
+        elif piece_type == SPIDER:
+            self.spiders ^= mask
         else:
             return None
 
@@ -934,6 +1046,26 @@ class BaseBoard:
             self.queens |= mask
         elif piece_type == KING:
             self.kings |= mask
+        elif piece_type == LEOPARD:
+            self.leopards |= mask
+        elif piece_type == CANNON:
+            self.cannons |= mask
+        elif piece_type == UNICORN:
+            self.unicorns |= mask
+        elif piece_type == DRAGON:
+            self.dragons |= mask
+        elif piece_type == CHANCELLOR:
+            self.chancellors |= mask
+        elif piece_type == ARCHBISHOP:
+            self.archbishops |= mask
+        elif piece_type == ELEPHANT:
+            self.elephants |= mask
+        elif piece_type == HAWK:
+            self.hawks |= mask
+        elif piece_type == FORTRESS:
+            self.fortresses |= mask
+        elif piece_type == SPIDER:
+            self.spiders |= mask
         else:
             return
 
@@ -1571,12 +1703,76 @@ class Board(BaseBoard):
         self.move_stack = []
         self._stack: List[_BoardState[BoardT]] = []
 
+        print("musketeer chess library init")
+
+        self.musketeer_pieces = {'white': None, 'black': None}
+        self.musketeer_columns = {'white': None, 'black': None}
+        self.musketeer_unlaunched = {'white': True, 'black': True}
+
         if fen is None:
             self.clear()
         elif fen == type(self).starting_fen:
             self.reset()
         else:
             self.set_fen(fen)
+
+
+    def select_musketeer_pieces(self, white_piece: str, black_piece: str) -> None:
+        """Selects the Musketeer pieces for both players.
+        set musketeer piece nams as 1 letter
+        piece name sould be musketeer piece name:
+        
+        "l", "c", "u", "d", "m", "a", "e", "h", "f", "s"
+        
+        "leopard", "cannon", "unicorn", "dragon", "chancellor", "archbishop", "elephant", "hawk", "fortress", "spider"
+        """
+        if white_piece.__len__() > 1 :
+            white_piece = PIECE_SYMBOLS[PIECE_NAMES.index(white_piece)]
+        if black_piece.__len__() > 1 :
+            black_piece = PIECE_SYMBOLS[PIECE_NAMES.index(black_piece)]
+
+        self.musketeer_pieces['white'] = white_piece.upper()
+        self.musketeer_pieces['black'] = black_piece
+
+    def place_musketeer_piece(self, color: str, column: Optional[int]) -> None:
+        """Declares the column for the Musketeer piece and updates the board.
+
+        set the column of musketeer piece as number
+        """
+        if color in self.musketeer_columns:
+            self.musketeer_columns[color] = FILE_NAMES.index(column)
+            # Update the board with the Musketeer piece placement
+            pass
+
+    def can_launch_musketeer(self) -> bool :
+        if self.musketeer_unlaunched['black'] and self.musketeer_pieces['black'] and self.turn is BLACK :
+            piece = self.piece_at(8 * 7 + self.musketeer_columns['black'])
+            print(piece)
+
+            return piece == None
+        if self.musketeer_unlaunched['white'] and self.musketeer_pieces['white'] and self.turn is WHITE :
+            piece = self.piece_at(self.musketeer_columns['white'])
+            print(piece)
+
+            return piece == None
+        return False
+    
+    def launch_musketeer(self) -> None:
+        # launch musketeers if possible
+
+        if self.can_launch_musketeer() :
+            if self.musketeer_pieces['white'] and self.turn is WHITE :
+                piece = Piece(PIECE_SYMBOLS.index(str(self.musketeer_pieces['white']).lower()), WHITE)
+                square = Square(self.musketeer_columns['white'])
+                self.set_piece_at(square, piece)
+                self.musketeer_unlaunched['white'] = False
+
+            if self.musketeer_pieces['black'] and self.turn is WHITE :
+                piece = Piece(PIECE_SYMBOLS.index(self.musketeer_pieces['black']), BLACK)
+                square = Square(8 * 7 + self.musketeer_columns['black'])
+                self.set_piece_at(square, piece)
+                self.musketeer_unlaunched['black'] = False
+        pass
 
     @property
     def legal_moves(self) -> LegalMoveGenerator:
@@ -1689,6 +1885,11 @@ class Board(BaseBoard):
 
         # Generate piece moves.
         non_pawns = our_pieces & ~self.pawns & from_mask
+        print('going to generated moves', our_pieces, ~self.pawns, from_mask)
+        print('our_pieces ', bin(our_pieces)[2:].zfill(64))
+        print('~self.pawns', bin(~self.pawns)[2:].zfill(64))
+        print('from_mask  ', bin(from_mask)[2:].zfill(64))
+        print('non_pawns  ', bin(non_pawns)[2:].zfill(64))
         for from_square in scan_reversed(non_pawns):
             moves = self.attacks_mask(from_square) & ~our_pieces & to_mask
             for to_square in scan_reversed(moves):
@@ -2237,6 +2438,7 @@ class Board(BaseBoard):
 
         promoted = bool(self.promoted & from_bb)
         piece_type = self._remove_piece_at(move.from_square)
+        print('remove piece type', piece_type)
         assert piece_type is not None, f"push() expects move to be pseudo-legal, but got {move} in {self.board_fen()}"
         capture_square = move.to_square
         captured_piece_type = self.piece_type_at(capture_square)
@@ -3006,6 +3208,8 @@ class Board(BaseBoard):
         except StopIteration:
             raise IllegalMoveError(f"illegal san: {san!r} in {self.fen()}")
 
+        print("passed castling")
+
         # Match normal moves.
         match = SAN_REGEX.match(san)
         if not match:
@@ -3020,6 +3224,7 @@ class Board(BaseBoard):
         # Get target square. Mask our own pieces to exclude castling moves.
         to_square = SQUARE_NAMES.index(match.group(4))
         to_mask = BB_SQUARES[to_square] & ~self.occupied_co[self.turn]
+        print('to_mask', bin(to_mask)[2:].zfill(64))
 
         # Get the promotion piece type.
         p = match.group(5)
@@ -3037,6 +3242,7 @@ class Board(BaseBoard):
         # Filter by piece type.
         if match.group(1):
             piece_type = PIECE_SYMBOLS.index(match.group(1).lower())
+            print("piece type", piece_type)
             from_mask &= self.pieces_mask(piece_type, self.turn)
         elif match.group(2) and match.group(3):
             # Allow fully specified moves, even if they are not pawn moves,
@@ -3055,7 +3261,9 @@ class Board(BaseBoard):
 
         # Match legal moves.
         matched_move = None
+        print(f"tried san {san!r}")
         for move in self.generate_legal_moves(from_mask, to_mask):
+            print('move', move)
             if move.promotion != promotion:
                 continue
 
@@ -3085,6 +3293,7 @@ class Board(BaseBoard):
         """
         move = self.parse_san(san)
         self.push(move)
+        self.launch_musketeer()
         return move
 
     def uci(self, move: Move, *, chess960: Optional[bool] = None) -> str:
@@ -3667,6 +3876,46 @@ class Board(BaseBoard):
             return f"{type(self).__name__}({self.fen()!r})"
         else:
             return f"{type(self).__name__}({self.fen()!r}, chess960=True)"
+
+    def __str__(self) -> str:
+        print("__str__ called")
+
+        builder: List[str] = []
+        
+        if self.musketeer_unlaunched['black'] and self.musketeer_pieces['black']:
+            for square in range(0, 8):
+                if square is not self.musketeer_columns['black']:
+                    builder.append(".")
+                else:
+                    builder.append(self.musketeer_pieces['black'])
+                builder.append(" ")
+            builder.append("\n")
+            pass
+
+        for square in SQUARES_180:
+            piece = self.piece_at(square)
+
+            if piece:
+                builder.append(piece.symbol())
+            else:
+                builder.append(".")
+
+            if BB_SQUARES[square] & BB_FILE_H:
+                if square != H1:
+                    builder.append("\n")
+            else:
+                builder.append(" ")
+
+        if self.musketeer_unlaunched['white'] and self.musketeer_pieces['white'] is not None:
+            builder.append("\n")
+            for square in range(0, 8):
+                if square is not self.musketeer_columns['white']:
+                    builder.append(".")
+                else:
+                    builder.append(self.musketeer_pieces['white'])
+                builder.append(" ")
+
+        return "".join(builder)
 
     def _repr_svg_(self) -> str:
         import chess.svg

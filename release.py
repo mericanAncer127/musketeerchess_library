@@ -2,7 +2,7 @@
 # Helper script to create and publish a new python-chess release.
 
 import os
-import chess
+import musketeerchess
 import sys
 import subprocess
 
@@ -40,7 +40,7 @@ def check_changelog():
         print("Found: Upcoming in")
         sys.exit(1)
 
-    tagname = f"v{chess.__version__}"
+    tagname = f"v{musketeerchess.__version__}"
     if tagname not in changelog:
         print(f"Not found: {tagname}")
         sys.exit(1)
@@ -53,7 +53,7 @@ def check_docs():
 
 def tag_and_push():
     print("--- TAG AND PUSH -------------------------------------------------")
-    tagname = f"v{chess.__version__}"
+    tagname = f"v{musketeerchess.__version__}"
     release_filename = f"release-{tagname}.txt"
 
     if not os.path.exists(release_filename):
